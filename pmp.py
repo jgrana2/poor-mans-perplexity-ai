@@ -157,6 +157,17 @@ def sendToGPT(copyPrompt):
         if chunk.choices[0].delta.content is not None:  # Check for NoneType instead of "None"
             print(chunk.choices[0].delta.content, end='')  # Specify end parameter
 
+def sendToOllama(copyPrompt):
+    import ollama
+    stream = ollama.chat(model='mistral', messages=[
+        {
+            'role': 'user',
+            'content': copyPrompt,
+        },
+        ], stream=True,)
+    for chunk in stream:
+        print(chunk['message']['content'], end='', flush=True)
+  
 # Example usage
 if __name__ == "__main__":
     load_dotenv()
@@ -202,5 +213,5 @@ if __name__ == "__main__":
         Then, at the end provide a list of steps to accomplish {query} based on the summary.  
         """
         print("\n") # New line
-        sendToGPT(prompt)
+        sendToOllama(prompt)
         print("\n") # New line
