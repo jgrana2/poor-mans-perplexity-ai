@@ -46,9 +46,12 @@ def get_headers():
 
 def safe_request(url, headers):
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()  # Raises HTTPError if status_code is not 200
         return response
+    except requests.Timeout:
+        print(f"[ERROR] Timeout fetching {url}")
+        return None
     except requests.RequestException as e:
         print(f"Request to {url} failed: {e}")
         return None
@@ -64,8 +67,11 @@ def parse_bing_response(response, num):
     return results
 
 # Add other functions for summarization, PDF processing, etc.
+import io
+
 def read_pdf_content(response):
-    with fitz.open(stream=response.raw, filetype="pdf") as doc:
+    pdf_bytes = response.content  # Get the PDF as bytes
+    with fitz.open(stream=io.BytesIO(pdf_bytes), filetype="pdf") as doc:
         text = ""
         for page in doc:
             text += page.get_text()
@@ -80,8 +86,15 @@ def is_pdf_response(response):
 
 def read_link_content(url):
     headers = {'User-Agent': 'Mozilla/5.0'}
-    response = requests.get(url, headers=headers, stream=True)
-    
+    try:
+        response = requests.get(url, headers=headers, stream=True, timeout=10)
+    except requests.Timeout:
+        print(f"[ERROR] Timeout fetching {url}")
+        return {'title': "Timeout", 'text': "", 'main_image': None}
+    except Exception as e:
+        print(f"[ERROR] Exception fetching {url}: {e}")
+        return {'title': "Error", 'text': "", 'main_image': None}
+
     if url.endswith('.pdf') or is_pdf_response(response):
         # The content is a PDF file
         text = read_pdf_content(response)
@@ -90,13 +103,10 @@ def read_link_content(url):
     else:
         # The content is HTML
         soup = BeautifulSoup(response.text, 'html.parser')
-        
         # Extract the title
         title = soup.title.string if soup.title else "No title"
-        
         # Extract the text
         text = ' '.join([p.text for p in soup.find_all('p')])
-        
         # Extract the main image
         main_image = soup.find('img')['src'] if soup.find('img') else None
 
@@ -129,19 +139,20 @@ def fetch_print_summarize(item):
     try:
         title = item.get('title')
         link = item.get('link')
-        print(link)
+        print(f"[INFO] Fetching: {link}")
         # Fetch and summarize the content of the link
         summary = fetch_and_summarize({'link': link})
+        print(f"[INFO] Done: {link}")
         return f"{title}, {link}\n{summary}\n"
     except Exception as exc:
-        print(f'URL resulted in an exception: {exc}')
+        print(f'[ERROR] URL resulted in an exception: {exc}')
         return ""
 
 def sendToGPT(copyPrompt):
     client = OpenAI()
     
     response = client.chat.completions.create(
-        model="gpt-4-1106-preview",
+        model="gpt-4.1-mini-2025-04-14",
         #model="gpt-4",
         #model="gpt-3.5-turbo-1106",
         #response_format={ "type": "json_object" },
@@ -171,7 +182,7 @@ def sendToOllama(copyPrompt):
 # Example usage
 if __name__ == "__main__":
     load_dotenv()
-    nltk.download('punkt')
+    nltk.download('punkt_tab')
 
     while True:
         query = input("Please enter the search query: ")
@@ -179,9 +190,12 @@ if __name__ == "__main__":
             print("Exiting the program.")
             break  # Break out of the while loop
 
+        print("[DEBUG] Starting search for query:", query)
         # Perform searches
         google_results = google_search(query)
+        print(f"[DEBUG] Google search returned {len(google_results)} results.")
         bing_results = bing_search(query)
+        print(f"[DEBUG] Bing search returned {len(bing_results)} results.")
 
         google_summaries = []
         bing_summaries = []
@@ -189,21 +203,31 @@ if __name__ == "__main__":
         print("\nSources:")
         # Process Google Search Results in parallel
         if google_results:
+            print("[INFO] Processing Google results...")
             with ThreadPoolExecutor(max_workers=10) as executor:
                 google_futures = {executor.submit(fetch_print_summarize, result): result for result in google_results}
                 for future in as_completed(google_futures):
-                    google_summaries.append(future.result())
+                    res = future.result()
+                    google_summaries.append(res)
+            print("[INFO] Finished processing Google results.")
+        else:
+            print("[WARN] No Google results to process.")
 
         # Process Bing Search Results in parallel
         if bing_results:
+            print("[INFO] Processing Bing results...")
             with ThreadPoolExecutor(max_workers=10) as executor:
                 bing_futures = {executor.submit(fetch_print_summarize, result): result for result in bing_results}
-                
                 for future in as_completed(bing_futures):
-                    bing_summaries.append(future.result())
+                    res = future.result()
+                    bing_summaries.append(res)
+            print("[INFO] Finished processing Bing results.")
+        else:
+            print("[WARN] No Bing results to process.")
 
         # Concatenate summaries from both search engines, if necessary
         all_summaries = ''.join(google_summaries + bing_summaries)
+        print("[DEBUG] Total summaries length:", len(all_summaries))
         prompt = f"""Given the following summarized websites from around the world related to {query}, provide a concise overview that captures the key points from all websites. If the query is a question, respond directly and give support with the summary:
 
         {all_summaries}
@@ -212,6 +236,6 @@ if __name__ == "__main__":
 
         Then, at the end provide a list of steps to accomplish {query} based on the summary.  
         """
-        print("\n") # New line
-        sendToOllama(prompt)
-        print("\n") # New line
+        print("\n[INFO] Sending summaries to GPT for final summary...\n")
+        sendToGPT(prompt)
+        print("\n[INFO] Done.\n")
