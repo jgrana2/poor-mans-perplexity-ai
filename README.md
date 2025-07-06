@@ -24,7 +24,7 @@ Poor Man's Perplexity AI is a script that harnesses the combined power of multip
 2. **Install dependencies:**
 
    ```bash
-   pip install requests beautifulsoup4 google-api-python-client python-dotenv PyMuPDF nltk openai
+   pip install requests beautifulsoup4 google-api-python-client python-dotenv PyMuPDF nltk openai rich
    ```
 
 3. **Download NLTK data:**

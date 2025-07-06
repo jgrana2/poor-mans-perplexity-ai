@@ -7,6 +7,9 @@ import fitz
 import nltk
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from openai import OpenAI
+from rich.markdown import Markdown
+from rich.console import Console
+from rich.live import Live
 
 # Function to perform a Google search
 def google_search(query, num_results=10):
@@ -150,23 +153,23 @@ def fetch_print_summarize(item):
 
 def sendToGPT(copyPrompt):
     client = OpenAI()
-    
     response = client.chat.completions.create(
         model="gpt-4.1-mini-2025-04-14",
-        #model="gpt-4",
-        #model="gpt-3.5-turbo-1106",
-        #response_format={ "type": "json_object" },
         messages=[
             {"role": "system", "content": "Eres un asistente útil."},
             {"role": "user", "content": copyPrompt}
         ],
         stream=True
     )
-    
-    # Stream the response
-    for chunk in response:
-        if chunk.choices[0].delta.content is not None:  # Check for NoneType instead of "None"
-            print(chunk.choices[0].delta.content, end='')  # Specify end parameter
+    console = Console()
+    full_response = ""
+    with Live(console=console, refresh_per_second=10) as live:
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                full_response += chunk.choices[0].delta.content
+                live.update(Markdown(full_response))
+    # Optionally print the final markdown after streaming
+    # console.print(Markdown(full_response))
 
 def sendToOllama(copyPrompt):
     import ollama
@@ -236,6 +239,6 @@ if __name__ == "__main__":
 
         Then, at the end provide a list of steps to accomplish {query} based on the summary.  
         """
-        print("\n[INFO] Sending summaries to GPT for final summary...\n")
+        print("\n[INFO] Creating final summary...\n")
         sendToGPT(prompt)
         print("\n[INFO] Done.\n")
