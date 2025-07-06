@@ -11,57 +11,50 @@ Poor Man's Perplexity AI is a script that harnesses the combined power of multip
 - **Advanced NLP Integration**: Utilize NLP tools like NLTK for text processing.
 - **AI-Enhanced Outputs**: Interact with OpenAI's GPT models for intelligent summary generation and task outlining.
 
-## Dependencies
 
-This script requires the following Python libraries:
+## Quick Start
 
-- `requests`
-- `beautifulsoup4`
-- `google-api-python-client`
-- `python-dotenv`
-- `PyMuPDF (fitz)`
-- `nltk`
-- `openai`
+1. **Create and activate a virtual environment:**
 
-Ensure that you have these installed in your Python environment. You can install them using pip:
+   ```bash
+   python -m venv env
+   source env/bin/activate
+   ```
 
-```bash
-pip install requests beautifulsoup4 google-api-python-client python-dotenv PyMuPDF nltk openai
-```
+2. **Install dependencies:**
 
-Additionally, make sure to download the `punkt` tokenizer models for NLTK:
+   ```bash
+   pip install requests beautifulsoup4 google-api-python-client python-dotenv PyMuPDF nltk openai
+   ```
 
-```python
-import nltk
-nltk.download('punkt')
-```
+3. **Download NLTK data:**
 
-## Configuration
+   ```python
+   import nltk
+   nltk.download('punkt_tab')
+   ```
 
-Before running the script, you will need:
+4. **Configure environment variables:**
 
-1. Google API and Custom Search Engine keys.
-2. Set up your environment variables for the API keys by creating a `.env` file:
+   - Create a `.env` file in the project directory with your API keys:
 
-```env
-API_KEY=your_google_api_key_here
-CSE_KEY=your_custom_search_engine_id_here
-```
+     ```env
+     API_KEY=your_google_api_key_here
+     CSE_KEY=your_custom_search_engine_id_here
+     OPENAI_API_KEY=your_openai_key_here
+     ```
 
-3. OpenAI key setup (make sure to configure it within the script or as an environment variable).
+5. **Run the app:**
 
-## Usage
+   ```bash
+   python pmp.py
+   ```
 
-Run the script in your terminal. The program runs in an interactive mode.
+   When prompted, enter your search query. Type `exit` to quit.
 
-```bash
-python pmp.py
-```
 
-When prompted, type your search query into the console. The script will fetch results from both search engines, summarize them, and pass them to the GPT model for further processing.
-
-To exit the program, type `exit`.
+---
 
 ## Note
 
-This is a utility script intended for educational and research purposes. It combines various APIs and leverages concurrency for improved performance. The effectiveness of the summaries and AI responses are highly dependent on the provided data quality and the sophistication of the underlying language models.
+This is a utility script intended for educational and research purposes. It combines various APIs and leverages concurrency for improved performance. The effectiveness of the summaries and AI responses depends on the provided data quality and the sophistication of the underlying language models.
