@@ -5,22 +5,45 @@ from dotenv import load_dotenv
 import os
 import fitz 
 import nltk
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from openai import OpenAI
 from rich.markdown import Markdown
 from rich.console import Console
 from rich.live import Live
 
+# Function to improve the search query using an LLM
+def improve_query_with_llm(user_input):
+    client = OpenAI()
+    prompt = (
+        "Given the following user input, generate a concise and effective web search query "
+        "with the most relevant keywords. Only output the improved query, nothing else.\n\n"
+        f"User input: {user_input}"
+    )
+    response = client.chat.completions.create(
+        model="gpt-4.1-mini-2025-04-14",
+        messages=[
+            {"role": "system", "content": "You are an expert at crafting effective search queries."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    # For OpenAI v1 API, the improved query is in response.choices[0].message.content
+    return response.choices[0].message.content.strip()
+
 # Function to perform a Google search
-def google_search(query, num_results=10):
+def google_search(query, num_results=10, recency_days=None):
     try:
         api_key = os.getenv('API_KEY')
         cse_key = os.getenv('CSE_KEY')
         # Build the resource object for Custom Search
         resource = build("customsearch", 'v1', developerKey=api_key).cse()
 
-        # Execute the search query
-        result = resource.list(q=query, cx=cse_key, num=num_results).execute()
+        params = {"q": query, "cx": cse_key, "num": num_results}
+        # If a recency window is requested, restrict results to that many days and sort by date
+        if recency_days:
+            params["dateRestrict"] = f"d{recency_days}"
+            params["sort"] = "date"          # newest first
+        result = resource.list(**params).execute()
 
         # Ensure the result is a dictionary and has the 'items' key
         if isinstance(result, dict) and 'items' in result:
@@ -35,9 +58,10 @@ def google_search(query, num_results=10):
         return []
 
 # Function to perform a Bing search
-def bing_search(query, num=10):
+def bing_search(query, num=10, recency_seconds=None):
     headers = get_headers()
-    bing_url = f"https://www.bing.com/search?q={query}"
+    qft_param = f"&qft=+filterui:age-lt{recency_seconds}" if recency_seconds else ""
+    bing_url = f"https://www.bing.com/search?q={urllib.parse.quote(query)}{qft_param}"
     response = safe_request(bing_url, headers)
     if not response:
         return []
@@ -193,11 +217,22 @@ if __name__ == "__main__":
             print("Exiting the program.")
             break  # Break out of the while loop
 
-        print("[DEBUG] Starting search for query:", query)
-        # Perform searches
-        google_results = google_search(query)
+        if not query.strip():
+            print("[ERROR] Query cannot be empty. Please enter a valid search query.")
+            continue
+
+        # Improve the query using LLM
+        improved_query = improve_query_with_llm(query)
+        if not improved_query.strip():
+            print("[ERROR] The improved query is empty. Please try again with a different input.")
+            continue
+        print(f"[INFO] Improved search query: {improved_query}")
+
+        # Perform searches with improved query
+        print("[DEBUG] Starting search for query:", improved_query)
+        google_results = google_search(improved_query, recency_days=365)
         print(f"[DEBUG] Google search returned {len(google_results)} results.")
-        bing_results = bing_search(query)
+        bing_results = bing_search(improved_query, recency_seconds=31536000)  # last 365 days
         print(f"[DEBUG] Bing search returned {len(bing_results)} results.")
 
         google_summaries = []
