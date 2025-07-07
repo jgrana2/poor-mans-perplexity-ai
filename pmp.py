@@ -11,13 +11,16 @@ from openai import OpenAI
 from rich.markdown import Markdown
 from rich.console import Console
 from rich.live import Live
+import datetime
 
 # Function to improve the search query using an LLM
 def improve_query_with_llm(user_input):
     client = OpenAI()
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     prompt = (
         "Given the following user input, generate a concise and effective web search query "
         "with the most relevant keywords. Only output the improved query, nothing else.\n\n"
+        f"Current date and time: {now}\n"
         f"User input: {user_input}"
     )
     response = client.chat.completions.create(
